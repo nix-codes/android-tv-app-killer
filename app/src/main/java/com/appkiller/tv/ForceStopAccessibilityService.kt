@@ -26,6 +26,7 @@ class ForceStopAccessibilityService : AccessibilityService() {
     private val skipFallbackRunnable = Runnable {
         if (state == State.WAITING_FOR_FORCE_STOP_BTN) {
             Log.d(TAG, "Fallback timeout — Force Stop not found, skipping $currentPackage")
+            currentPackage?.let { RunningAppsHelper.killedAt[it] = System.currentTimeMillis() }
             state = State.IDLE
             processNextPackage()
         }
@@ -34,6 +35,7 @@ class ForceStopAccessibilityService : AccessibilityService() {
     private var eventsSinceStateChange = 0
 
     private val processRunnable = Runnable { processCurrentState() }
+    private val processNextRunnable = Runnable { processNextPackage() }
 
     companion object {
         private const val TAG = "AppKiller"
@@ -50,9 +52,13 @@ class ForceStopAccessibilityService : AccessibilityService() {
                 Log.e(TAG, "startKilling: service instance is null")
                 return
             }
+            svc.handler.removeCallbacks(svc.processNextRunnable)
+            svc.handler.removeCallbacks(svc.processRunnable)
+            svc.handler.removeCallbacks(svc.skipFallbackRunnable)
+            svc.state = State.IDLE
             svc.queue.clear()
             svc.queue.addAll(packages)
-            svc.handler.post { svc.processNextPackage() }
+            svc.handler.post(svc.processNextRunnable)
         }
     }
 
@@ -73,10 +79,11 @@ class ForceStopAccessibilityService : AccessibilityService() {
 
         if (eventsSinceStateChange > 40) {
             Log.w(TAG, "Timeout waiting in state $state — skipping package")
+            currentPackage?.let { RunningAppsHelper.killedAt[it] = System.currentTimeMillis() }
             eventsSinceStateChange = 0
             state = State.IDLE
             handler.removeCallbacks(processRunnable)
-            handler.postDelayed(::processNextPackage, 500)
+            handler.postDelayed(processNextRunnable, 500)
             return
         }
 
@@ -93,6 +100,7 @@ class ForceStopAccessibilityService : AccessibilityService() {
     }
 
     private fun processNextPackage() {
+        handler.removeCallbacks(processNextRunnable)
         if (queue.isEmpty()) {
             state = State.IDLE
             returnToMainApp()
@@ -131,27 +139,28 @@ class ForceStopAccessibilityService : AccessibilityService() {
             for (node in nodes) {
                 Log.d(TAG, "    node: class=${node.className} clickable=${node.isClickable} enabled=${node.isEnabled} text='${node.text}'")
                 val clickable = findClickableNode(node)
-                if (clickable != null) {
-                    if (clickable.isEnabled) {
-                        Log.d(TAG, "  clicking Force Stop (via ${clickable.className})")
-                        handler.removeCallbacks(skipFallbackRunnable)
-                        clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        clickable.recycle()
-                        node.recycle()
-                        root.recycle()
-                        eventsSinceStateChange = 0
-                        state = State.WAITING_FOR_CONFIRM_BTN
-                        return
-                    } else {
-                        Log.d(TAG, "  Force Stop found but disabled — app not running, skipping")
-                        handler.removeCallbacks(skipFallbackRunnable)
-                        clickable.recycle()
-                        node.recycle()
-                        root.recycle()
-                        state = State.IDLE
-                        handler.postDelayed(::processNextPackage, 300)
-                        return
-                    }
+                val isDisabled = clickable?.isEnabled == false || (!node.isEnabled && clickable == null)
+                if (isDisabled) {
+                    Log.d(TAG, "  Force Stop found but disabled — app not running, skipping")
+                    handler.removeCallbacks(skipFallbackRunnable)
+                    currentPackage?.let { RunningAppsHelper.killedAt[it] = System.currentTimeMillis() }
+                    clickable?.recycle()
+                    node.recycle()
+                    root.recycle()
+                    state = State.IDLE
+                    handler.postDelayed(processNextRunnable, 300)
+                    return
+                }
+                if (clickable != null && clickable.isEnabled) {
+                    Log.d(TAG, "  clicking Force Stop (via ${clickable.className})")
+                    handler.removeCallbacks(skipFallbackRunnable)
+                    clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    clickable.recycle()
+                    node.recycle()
+                    root.recycle()
+                    eventsSinceStateChange = 0
+                    state = State.WAITING_FOR_CONFIRM_BTN
+                    return
                 }
             }
         }
@@ -185,7 +194,7 @@ class ForceStopAccessibilityService : AccessibilityService() {
                     root.recycle()
                     currentPackage?.let { RunningAppsHelper.killedAt[it] = System.currentTimeMillis() }
                     state = State.IDLE
-                    handler.postDelayed(::processNextPackage, 800)
+                    handler.postDelayed(processNextRunnable, 800)
                     return
                 }
             }

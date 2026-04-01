@@ -11,9 +11,15 @@ import androidx.recyclerview.widget.RecyclerView
 class AppListAdapter(
     private var whitelist: Set<String> = emptySet(),
     private val onSelectionChanged: (selectedCount: Int, killableSelectedCount: Int) -> Unit
-) : RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val apps = mutableListOf<AppItem>()
+    companion object {
+        private const val TYPE_APP = 0
+        private const val TYPE_HEADER = 1
+    }
+
+    private val killableApps = mutableListOf<AppItem>()
+    private val protectedApps = mutableListOf<AppItem>()
 
     inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val icon: ImageView = view.findViewById(R.id.app_icon)
@@ -24,7 +30,10 @@ class AppListAdapter(
 
         init {
             view.setOnClickListener {
-                val app = apps[adapterPosition]
+                val pos = bindingAdapterPosition
+                if (pos == RecyclerView.NO_ID.toInt()) return@setOnClickListener
+                if (getItemViewType(pos) != TYPE_APP) return@setOnClickListener
+                val app = getAppAt(pos)
                 app.isSelected = !app.isSelected
                 checkbox.isChecked = app.isSelected
                 fireSelectionCallback()
@@ -32,13 +41,29 @@ class AppListAdapter(
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_app, parent, false)
-        return ViewHolder(view)
+    inner class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val text: TextView = view.findViewById(R.id.section_header_text)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val app = apps[position]
+    override fun getItemViewType(position: Int): Int =
+        if (protectedApps.isNotEmpty() && position == killableApps.size) TYPE_HEADER else TYPE_APP
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == TYPE_HEADER) {
+            HeaderViewHolder(inflater.inflate(R.layout.item_section_header, parent, false))
+        } else {
+            ViewHolder(inflater.inflate(R.layout.item_app, parent, false))
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is HeaderViewHolder) {
+            holder.text.text = "Protected (${protectedApps.size})"
+            return
+        }
+        val app = getAppAt(position)
+        holder as ViewHolder
         holder.icon.setImageDrawable(app.icon)
         holder.name.text = app.appName
         holder.packageName.text = app.packageName
@@ -46,37 +71,49 @@ class AppListAdapter(
         holder.lockIcon.visibility = if (app.isWhitelisted) View.VISIBLE else View.GONE
     }
 
-    override fun getItemCount() = apps.size
+    override fun getItemCount(): Int =
+        killableApps.size + if (protectedApps.isEmpty()) 0 else 1 + protectedApps.size
+
+    private fun getAppAt(position: Int): AppItem =
+        if (position < killableApps.size) killableApps[position]
+        else protectedApps[position - killableApps.size - 1]
 
     fun updateApps(newApps: List<AppItem>) {
-        apps.clear()
-        apps.addAll(newApps.map { it.copy(isWhitelisted = it.packageName in whitelist) })
+        killableApps.clear()
+        protectedApps.clear()
+        newApps.map { it.copy(isWhitelisted = it.packageName in whitelist) }
+            .partition { !it.isWhitelisted }
+            .let { (k, p) -> killableApps.addAll(k); protectedApps.addAll(p) }
         notifyDataSetChanged()
         fireSelectionCallback()
     }
 
     fun updateWhitelist(newWhitelist: Set<String>) {
         whitelist = newWhitelist
-        apps.forEach { it.isWhitelisted = it.packageName in whitelist }
+        val allApps = (killableApps + protectedApps).map { it.copy(isWhitelisted = it.packageName in whitelist, isSelected = false) }
+        killableApps.clear()
+        protectedApps.clear()
+        allApps.partition { !it.isWhitelisted }
+            .let { (k, p) -> killableApps.addAll(k); protectedApps.addAll(p) }
         notifyDataSetChanged()
         fireSelectionCallback()
     }
 
     fun getSelectedPackages(): List<String> =
-        apps.filter { it.isSelected && !it.isWhitelisted }.map { it.packageName }
+        killableApps.filter { it.isSelected }.map { it.packageName }
 
     fun getAllPackages(): List<String> =
-        apps.filter { !it.isWhitelisted }.map { it.packageName }
+        killableApps.map { it.packageName }
 
     fun getCheckedUnprotectedPackages(): List<String> =
-        apps.filter { it.isSelected && !it.isWhitelisted }.map { it.packageName }
+        killableApps.filter { it.isSelected }.map { it.packageName }
 
     fun getCheckedProtectedPackages(): List<String> =
-        apps.filter { it.isSelected && it.isWhitelisted }.map { it.packageName }
+        protectedApps.filter { it.isSelected }.map { it.packageName }
 
     private fun fireSelectionCallback() {
-        val selectedCount = apps.count { it.isSelected }
-        val killableSelectedCount = apps.count { it.isSelected && !it.isWhitelisted }
+        val selectedCount = killableApps.count { it.isSelected } + protectedApps.count { it.isSelected }
+        val killableSelectedCount = killableApps.count { it.isSelected }
         onSelectionChanged(selectedCount, killableSelectedCount)
     }
 }

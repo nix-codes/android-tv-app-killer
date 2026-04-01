@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_focused">#3D5AFE</color>
+    <color name="bg_normal">#00000000</color>
+    <color name="btn_normal">#2A2A4A</color>
+    <color name="bg_app">#1A1A2E</color>
+</resources>

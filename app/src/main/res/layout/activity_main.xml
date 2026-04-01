@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_app"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="App Killer"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Loading..."
+        android:textSize="15sp"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="8dp"/>
+
+    <Button
+        android:id="@+id/btn_grant_usage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Grant Usage Access"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp"
+        android:focusable="true"/>
+
+    <Button
+        android:id="@+id/btn_grant_accessibility"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Grant Accessibility Permission"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp"
+        android:focusable="true"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/apps_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:focusable="false"
+        android:clipToPadding="false"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/btn_refresh"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="Refresh"
+            android:focusable="true"
+            android:nextFocusUp="@id/apps_recycler"
+            android:background="@drawable/button_selector"
+            android:textColor="#FFFFFF"/>
+
+        <Button
+            android:id="@+id/btn_kill_selected"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="Kill Selected (0)"
+            android:focusable="true"
+            android:nextFocusUp="@id/apps_recycler"
+            android:background="@drawable/button_selector"
+            android:textColor="#FFFFFF"/>
+
+        <Button
+            android:id="@+id/btn_kill_all"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Kill All (0)"
+            android:focusable="true"
+            android:nextFocusUp="@id/apps_recycler"
+            android:background="@drawable/button_selector"
+            android:textColor="#FFFFFF"/>
+
+    </LinearLayout>
+
+</LinearLayout>

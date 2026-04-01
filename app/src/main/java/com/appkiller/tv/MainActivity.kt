@@ -19,7 +19,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRefresh: Button
     private lateinit var btnGrantUsage: Button
     private lateinit var btnGrantAccessibility: Button
+    private lateinit var btnProtect: Button
+    private lateinit var btnUnprotect: Button
     private lateinit var adapter: AppListAdapter
+    private var whitelist: MutableSet<String> = mutableSetOf()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,9 +35,13 @@ class MainActivity : AppCompatActivity() {
         btnRefresh = findViewById(R.id.btn_refresh)
         btnGrantUsage = findViewById(R.id.btn_grant_usage)
         btnGrantAccessibility = findViewById(R.id.btn_grant_accessibility)
+        btnProtect = findViewById(R.id.btn_protect)
+        btnUnprotect = findViewById(R.id.btn_unprotect)
 
-        adapter = AppListAdapter { selectedCount ->
-            btnKillSelected.text = "Kill Selected ($selectedCount)"
+        whitelist = WhitelistRepository.load(this).toMutableSet()
+
+        adapter = AppListAdapter(whitelist) { _, killableSelectedCount ->
+            updateButtonLabels(killableSelectedCount)
         }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -49,6 +56,24 @@ class MainActivity : AppCompatActivity() {
         btnKillSelected.setOnClickListener {
             val packages = adapter.getSelectedPackages()
             if (packages.isNotEmpty()) startKilling(packages)
+        }
+
+        btnProtect.setOnClickListener {
+            val toProtect = adapter.getCheckedUnprotectedPackages()
+            if (toProtect.isEmpty()) return@setOnClickListener
+            whitelist.addAll(toProtect)
+            WhitelistRepository.save(this, whitelist)
+            adapter.updateWhitelist(whitelist)
+            btnKillAll.text = "Kill All (${adapter.getAllPackages().size})"
+        }
+
+        btnUnprotect.setOnClickListener {
+            val toUnprotect = adapter.getCheckedProtectedPackages()
+            if (toUnprotect.isEmpty()) return@setOnClickListener
+            whitelist.removeAll(toUnprotect.toSet())
+            WhitelistRepository.save(this, whitelist)
+            adapter.updateWhitelist(whitelist)
+            btnKillAll.text = "Kill All (${adapter.getAllPackages().size})"
         }
 
         btnGrantUsage.setOnClickListener {
@@ -81,15 +106,34 @@ class MainActivity : AppCompatActivity() {
         statusText.text = "Loading..."
         btnKillAll.text = "Kill All"
         btnKillSelected.text = "Kill Selected (0)"
+        btnProtect.text = "Protect (0)"
+        btnProtect.isEnabled = false
+        btnUnprotect.text = "Unprotect (0)"
+        btnUnprotect.isEnabled = false
 
         Thread {
             val apps = RunningAppsHelper.getRunningUserApps(this)
             runOnUiThread {
                 adapter.updateApps(apps)
-                statusText.text = "${apps.size} apps found in last 24h"
-                btnKillAll.text = "Kill All (${apps.size})"
+                val killableCount = adapter.getAllPackages().size
+                val protectedCount = apps.size - killableCount
+                statusText.text = if (protectedCount > 0)
+                    "${apps.size} apps found (${protectedCount} protected)"
+                else
+                    "${apps.size} apps found in last 24h"
+                btnKillAll.text = "Kill All ($killableCount)"
             }
         }.start()
+    }
+
+    private fun updateButtonLabels(killableSelectedCount: Int) {
+        btnKillSelected.text = "Kill Selected ($killableSelectedCount)"
+        val protectCount = adapter.getCheckedUnprotectedPackages().size
+        val unprotectCount = adapter.getCheckedProtectedPackages().size
+        btnProtect.text = "Protect ($protectCount)"
+        btnProtect.isEnabled = protectCount > 0
+        btnUnprotect.text = "Unprotect ($unprotectCount)"
+        btnUnprotect.isEnabled = unprotectCount > 0
     }
 
     private fun startKilling(packages: List<String>) {
@@ -97,7 +141,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             return
         }
-        statusText.text = "Killing ${packages.size} app(s)..."
-        ForceStopAccessibilityService.startKilling(packages)
+        val safe = packages.filter { it !in whitelist }
+        if (safe.isEmpty()) return
+        statusText.text = "Killing ${safe.size} app(s)..."
+        ForceStopAccessibilityService.startKilling(safe)
     }
 }

@@ -50,4 +50,14 @@
 
     </LinearLayout>
 
+    <ImageView
+        android:id="@+id/app_lock_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
+        android:src="@android:drawable/ic_lock_lock"
+        android:visibility="gone"
+        android:contentDescription="@string/lock_icon_desc"
+        android:focusable="false"/>
+
 </LinearLayout>

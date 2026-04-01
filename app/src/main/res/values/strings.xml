@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">App Killer</string>
     <string name="accessibility_service_description">Required to automatically navigate Settings and force stop selected apps</string>
+    <string name="lock_icon_desc">Protected — will not be killed</string>
 </resources>

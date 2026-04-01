@@ -89,7 +89,29 @@
                 android:id="@+id/btn_kill_all"
                 android:layout_width="160dp"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
                 android:text="Kill All (0)"
+                android:focusable="true"
+                android:nextFocusLeft="@id/apps_recycler"
+                android:background="@drawable/button_selector"
+                android:textColor="#FFFFFF"/>
+
+            <Button
+                android:id="@+id/btn_protect"
+                android:layout_width="160dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:text="Protect (0)"
+                android:focusable="true"
+                android:nextFocusLeft="@id/apps_recycler"
+                android:background="@drawable/button_selector"
+                android:textColor="#FFFFFF"/>
+
+            <Button
+                android:id="@+id/btn_unprotect"
+                android:layout_width="160dp"
+                android:layout_height="wrap_content"
+                android:text="Unprotect (0)"
                 android:focusable="true"
                 android:nextFocusLeft="@id/apps_recycler"
                 android:background="@drawable/button_selector"

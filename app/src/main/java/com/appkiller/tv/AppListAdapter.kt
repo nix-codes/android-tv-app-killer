@@ -9,7 +9,8 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class AppListAdapter(
-    private val onSelectionChanged: (Int) -> Unit
+    private var whitelist: Set<String> = emptySet(),
+    private val onSelectionChanged: (selectedCount: Int, killableSelectedCount: Int) -> Unit
 ) : RecyclerView.Adapter<AppListAdapter.ViewHolder>() {
 
     private val apps = mutableListOf<AppItem>()
@@ -19,13 +20,14 @@ class AppListAdapter(
         val name: TextView = view.findViewById(R.id.app_name)
         val packageName: TextView = view.findViewById(R.id.app_package)
         val checkbox: CheckBox = view.findViewById(R.id.app_checkbox)
+        val lockIcon: ImageView = view.findViewById(R.id.app_lock_icon)
 
         init {
             view.setOnClickListener {
                 val app = apps[adapterPosition]
                 app.isSelected = !app.isSelected
                 checkbox.isChecked = app.isSelected
-                onSelectionChanged(apps.count { it.isSelected })
+                fireSelectionCallback()
             }
         }
     }
@@ -41,18 +43,40 @@ class AppListAdapter(
         holder.name.text = app.appName
         holder.packageName.text = app.packageName
         holder.checkbox.isChecked = app.isSelected
+        holder.lockIcon.visibility = if (app.isWhitelisted) View.VISIBLE else View.GONE
     }
 
     override fun getItemCount() = apps.size
 
     fun updateApps(newApps: List<AppItem>) {
         apps.clear()
-        apps.addAll(newApps)
+        apps.addAll(newApps.map { it.copy(isWhitelisted = it.packageName in whitelist) })
         notifyDataSetChanged()
-        onSelectionChanged(0)
+        fireSelectionCallback()
     }
 
-    fun getSelectedPackages(): List<String> = apps.filter { it.isSelected }.map { it.packageName }
+    fun updateWhitelist(newWhitelist: Set<String>) {
+        whitelist = newWhitelist
+        apps.forEach { it.isWhitelisted = it.packageName in whitelist }
+        notifyDataSetChanged()
+        fireSelectionCallback()
+    }
 
-    fun getAllPackages(): List<String> = apps.map { it.packageName }
+    fun getSelectedPackages(): List<String> =
+        apps.filter { it.isSelected && !it.isWhitelisted }.map { it.packageName }
+
+    fun getAllPackages(): List<String> =
+        apps.filter { !it.isWhitelisted }.map { it.packageName }
+
+    fun getCheckedUnprotectedPackages(): List<String> =
+        apps.filter { it.isSelected && !it.isWhitelisted }.map { it.packageName }
+
+    fun getCheckedProtectedPackages(): List<String> =
+        apps.filter { it.isSelected && it.isWhitelisted }.map { it.packageName }
+
+    private fun fireSelectionCallback() {
+        val selectedCount = apps.count { it.isSelected }
+        val killableSelectedCount = apps.count { it.isSelected && !it.isWhitelisted }
+        onSelectionChanged(selectedCount, killableSelectedCount)
+    }
 }
